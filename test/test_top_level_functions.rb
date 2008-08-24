@@ -58,27 +58,4 @@ class TestTopLevelFunctions < Test::Unit::TestCase
     RakeFileUtils.nowrite_flag = false
   end
 
-  def test_missing_constants_task
-    Rake.application.should_receive(:const_warning).with(:Task).once
-    Object.const_missing(:Task)
-  end
-
-  def test_missing_constants_file_task
-    Rake.application.should_receive(:const_warning).with(:FileTask).once
-    Object.const_missing(:FileTask)
-  end
-
-  def test_missing_constants_file_creation_task
-    Rake.application.should_receive(:const_warning).with(:FileCreationTask).once
-    Object.const_missing(:FileCreationTask)
-  end
-
-  def test_missing_constants_rake_app
-    Rake.application.should_receive(:const_warning).with(:RakeApp).once
-    Object.const_missing(:RakeApp)
-  end
-
-  def test_missing_other_constant
-    assert_raise(NameError) do Object.const_missing(:Xyz) end
-  end
 end
