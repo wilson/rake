@@ -1,3 +1,5 @@
 TAGS
 temp_*
+*.swp
 pkg
+coverage
