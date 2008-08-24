@@ -1,4 +1,20 @@
 module Rake
+  # Raised when a declared rule is 16 or more dependencies deep
+  class RuleRecursionOverflowError < StandardError
+    def initialize(*args)
+      super
+      @targets = []
+    end
+
+    def add_target(target)
+      @targets << target
+    end
+
+    def message
+      super + ": [" + @targets.reverse.join(' => ') + "]"
+    end
+  end
+  
   ####################################################################
   # The TaskManager module is a mixin for managing tasks.
   module TaskManager

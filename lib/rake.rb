@@ -86,26 +86,4 @@ module Rake
     end
   end
 
-  class RuleRecursionOverflowError < StandardError
-    def initialize(*args)
-      super
-      @targets = []
-    end
-
-    def add_target(target)
-      @targets << target
-    end
-
-    def message
-      super + ": [" + @targets.reverse.join(' => ') + "]"
-    end
-  end
-
-  # Default Rakefile loader used by +import+.
-  class DefaultLoader
-    def load(fn)
-      Kernel.load(File.expand_path(fn))
-    end
-  end
-
 end # module Rake

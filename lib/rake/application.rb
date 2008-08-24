@@ -1,4 +1,12 @@
 module Rake
+
+  # Default Rakefile loader used by +import+.
+  class DefaultLoader
+    def load(fn)
+      Kernel.load(File.expand_path(fn))
+    end
+  end
+
   ######################################################################
   # Rake main application object.  When invoking +rake+ from the
   # command line, a Rake::Application object is created and run.
