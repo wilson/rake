@@ -170,6 +170,25 @@ module Rake
       @scope.pop
     end
 
+    # Returns the current Task instances without any further processing
+    def all_tasks
+      @tasks
+    end
+
+    # Clear out a task by name or regexp.
+    # Use this if you want to completely replace a task instead
+    # of extending it.
+    def clear_tasks(*tasks)
+      tasks.flatten.each do |name|
+        case name
+        when Regexp then
+          all_tasks.delete_if { |k,_| k =~ name }
+        else
+          all_tasks.delete(name.to_s)
+        end
+      end
+    end
+
     private
 
     # Generate an anonymous namespace name.
