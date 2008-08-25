@@ -105,9 +105,6 @@ module RakeFileUtils
   RakeFileUtils.verbose_flag = :default
   RakeFileUtils.nowrite_flag = false
 
-  $fileutils_verbose = true
-  $fileutils_nowrite = false
-
   FileUtils::OPT_TABLE.each do |name, opts|
     default_options = []
     if opts.include?(:verbose) || opts.include?("verbose")

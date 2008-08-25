@@ -23,25 +23,25 @@ class TestTaskManager < Test::Unit::TestCase
     assert_equal @tm, t.application
   end
 
-  def test_all_tasks
+  def test_task_map
     t1 = @tm.define_task(Rake::Task, :task1)
     t2 = @tm.define_task(Rake::Task, :task2)
     expected_tasks = {"task1" => t1, "task2" => t2}
-    assert_equal expected_tasks, @tm.all_tasks
+    assert_equal expected_tasks, @tm.task_map
   end
 
-  def test_clear_tasks
+  def test_remove_task
     t = @tm.define_task(Rake::Task, :some_task)
     @tm.define_task(Rake::Task, :another_task)
-    @tm.clear_tasks(:another_task)
-    assert_equal Hash["some_task", t], @tm.all_tasks
+    @tm.remove_task(:another_task)
+    assert_equal Hash["some_task", t], @tm.task_map
   end
 
-  def test_clear_tasks_with_regexp
+  def test_remove_task_regexp
     @tm.define_task(Rake::Task, :some_task)
     t = @tm.define_task(Rake::Task, :another_task)
-    @tm.clear_tasks(/some/)
-    assert_equal Hash["another_task", t], @tm.all_tasks
+    @tm.remove_task(/some/)
+    assert_equal Hash["another_task", t], @tm.task_map
   end
 
   def test_name_lookup

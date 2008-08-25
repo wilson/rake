@@ -49,6 +49,27 @@ module Rake
       task
     end
 
+    # Completely removes a single task (and its enhancements) by
+    # name when passed a +String+ or +Symbol.
+    # When passed a +Regexp+, removes all tasks with matching names
+    # Use this if you want to completely replace a task instead
+    # of extending it.
+    def remove_task(name)
+      case name
+      when Regexp then
+        @tasks.delete_if { |k,_| k =~ name }
+      else
+        @tasks.delete(name.to_s)
+      end
+    end
+
+    # Returns a +Hash+ with the names of the defined tasks as keys
+    # The values are arrays of +Rake::Task+ objects.
+    # Modifications to the returned Hash will change the task list
+    def task_map
+      @tasks
+    end
+
     # Lookup a task.  Return an existing task if found, otherwise
     # create a task of the current type.
     def intern(task_class, task_name)
@@ -168,25 +189,6 @@ module Rake
       ns
     ensure
       @scope.pop
-    end
-
-    # Returns the current Task instances without any further processing
-    def all_tasks
-      @tasks
-    end
-
-    # Clear out a task by name or regexp.
-    # Use this if you want to completely replace a task instead
-    # of extending it.
-    def clear_tasks(*tasks)
-      tasks.flatten.each do |name|
-        case name
-        when Regexp then
-          all_tasks.delete_if { |k,_| k =~ name }
-        else
-          all_tasks.delete(name.to_s)
-        end
-      end
     end
 
     private
