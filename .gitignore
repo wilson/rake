@@ -2,4 +2,7 @@ TAGS
 temp_*
 *.swp
 pkg
+*.patch
+.#*
+x
 coverage

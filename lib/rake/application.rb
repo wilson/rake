@@ -33,7 +33,7 @@ module Rake
       super
       @name = 'rake'
       @rakefiles = DEFAULT_RAKEFILES.dup
-      @rakefile = nil
+      @rakefile = ''
       @pending_imports = []
       @imported = []
       @loaders = {}
@@ -147,7 +147,7 @@ module Rake
 
     # True if one of the files in RAKEFILES is in the current directory.
     # If a match is found, it is copied into @rakefile.
-    def have_rakefile
+    def have_project_rakefile
       @rakefiles.each do |fn|
         if File.exist?(fn) || fn == ''
           @rakefile = fn
@@ -223,7 +223,11 @@ module Rake
     def unix?
       RUBY_PLATFORM =~ /(aix|darwin|linux|(net|free|open)bsd|cygwin|solaris|irix|hpux|)/i
     end
-    
+
+    def windows?
+      Config::CONFIG['host_os'] =~ /mswin/
+    end
+
     def truncate(string, width)
       if string.length <= width
         string
@@ -289,6 +293,12 @@ module Rake
         ],
         ['--libdir', '-I LIBDIR', "Include LIBDIR in the search path for required modules.",
           lambda { |value| $:.push(value) }
+        ],
+        ['--system',  '-G', "Run tasks using system wide (global) rakefiles (usually '~/.rake/*.rake'). Project Rakefiles are ignored.",
+          lambda { |value| options.load_system = true }
+        ],
+        ['--no-system',  '-g', "Run tasks using standard project Rakefile search paths, ignoring system wide rakefiles.",
+          lambda { |value| options.ignore_system = true }
         ],
         ['--nosearch', '-N', "Do not search parent directories for the Rakefile.",
           lambda { |value| options.nosearch = true }
@@ -367,13 +377,13 @@ module Rake
         opts.separator ""
         opts.separator "Options are ..."
 
-      	opts.on_tail("-h", "--help", "-H", "Display this help message.") do
-    	  	puts opts
-    		  exit
-      	end
+        opts.on_tail("-h", "--help", "-H", "Display this help message.") do
+          puts opts
+          exit
+        end
 
         op_options.each { |args| opts.on(*args) }
-      	parsed_argv = opts.parse(ARGV)
+        parsed_argv = opts.parse(ARGV)
       end
 
       # If class namespaces are requested, set the global options
@@ -391,7 +401,7 @@ module Rake
     end
 
     # Similar to the regular Ruby +require+ command, but will check
-    # for .rake files in addition to .rb files.
+    # for *.rake files in addition to *.rb files.
     def rake_require(file_name, paths=$LOAD_PATH, loaded=$")
       return false if loaded.include?(file_name)
       paths.each do |path|
@@ -408,21 +418,59 @@ module Rake
 
     def raw_load_rakefile # :nodoc:
       here = Dir.pwd
-      while ! have_rakefile
-        Dir.chdir("..")
-        if Dir.pwd == here || options.nosearch
-          fail "No Rakefile found (looking for: #{@rakefiles.join(', ')})"
+      if (options.load_system || ! have_project_rakefile) && ! options.ignore_system && have_system_rakefiles
+        Dir["#{system_dir}/*.rake"].each do |name|
+          add_import name
         end
-        here = Dir.pwd
+      else
+        while ! have_project_rakefile
+          Dir.chdir("..")
+          if Dir.pwd == here || options.nosearch
+            fail "No Rakefile found (looking for: #{@rakefiles.join(', ')})"
+          end
+          here = Dir.pwd
+        end
       end
       puts "(in #{Dir.pwd})" unless options.silent
       $rakefile = @rakefile
-      load File.expand_path(@rakefile) if @rakefile != ''
+      load File.expand_path(@rakefile) unless @rakefile.empty?
       options.rakelib.each do |rlib|
         Dir["#{rlib}/*.rake"].each do |name| add_import name end
       end
       load_imports
     end
+
+    def have_system_rakefiles
+      Dir[File.join(system_dir, '*.rake')].size > 0
+    end
+
+    # The directory containing the system-wide Rakefiles
+    def system_dir
+      if ENV['RAKE_SYSTEM']
+        ENV['RAKE_SYSTEM']
+      elsif windows?
+        win32_system_dir
+      else
+        standard_system_dir
+      end
+    end
+
+    # The standard directory containing system wide rake files.
+    def standard_system_dir #:nodoc:
+      File.join(File.expand_path('~'), '.rake')
+    end
+    private :standard_system_dir
+    
+    # The standard directory containing system wide rake files on Win
+    # 32 systems.
+    def win32_system_dir #:nodoc:
+      unless File.exists?(win32home = File.join(ENV['APPDATA'], 'Rake'))
+        raise Win32HomeError, "# Unable to determine home path environment variable."
+      else
+        win32home
+      end
+    end
+    private :win32_system_dir
 
     # Collect the list of tasks on the command line.  If no tasks are
     # given, return a list containing only the default task.

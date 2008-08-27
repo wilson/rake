@@ -110,14 +110,14 @@ class TestApplication < Test::Unit::TestCase
   end
 
   def test_finding_rakefile
-    assert @app.instance_eval { have_rakefile }
+    assert @app.instance_eval { have_project_rakefile }
     assert_equal "rakefile", @app.rakefile.downcase
   end
 
   def test_not_finding_rakefile
     @app.instance_eval { @rakefiles = ['NEVER_FOUND'] }
-    assert( ! @app.instance_eval do have_rakefile end )
-    assert_nil @app.rakefile
+    assert( ! @app.instance_eval do have_project_rakefile end )
+    assert_equal '', @app.rakefile
   end
 
   def test_load_rakefile
@@ -126,6 +126,7 @@ class TestApplication < Test::Unit::TestCase
     @app.instance_eval do 
       handle_options
       options.silent = true
+      options.ignore_system = true
       load_rakefile
     end
     assert_equal "rakefile", @app.rakefile.downcase
@@ -149,23 +150,36 @@ class TestApplication < Test::Unit::TestCase
   end
 
   def test_load_rakefile_not_found
-    original_dir = Dir.pwd
-    Dir.chdir("/")
-    @app.instance_eval do
-      handle_options
-      options.silent = true
+    in_environment("PWD" => "/") do
+      @app.instance_eval do
+        handle_options
+        options.silent = true
+        options.ignore_system = true
+      end
+      ex = assert_raise(RuntimeError) do 
+        @app.instance_eval do raw_load_rakefile end 
+      end
+      assert_match(/no rakefile found/i, ex.message)
     end
-    ex = assert_raise(RuntimeError) do 
-      @app.instance_eval do raw_load_rakefile end 
+  end
+
+  def test_load_from_system_rakefile
+    in_environment('RAKE_SYSTEM' => 'test') do
+      @app.options.rakelib = []
+      @app.instance_eval do
+        handle_options
+        options.silent = true
+        options.load_system = true
+        load_rakefile
+      end
+      assert_equal "test", @app.system_dir
+      assert_equal '', @app.rakefile
     end
-    assert_match(/no rakefile found/i, ex.message)
-  ensure
-    Dir.chdir(original_dir)
   end
 
   def test_not_caring_about_finding_rakefile
     @app.instance_eval do @rakefiles = [''] end
-    assert(@app.instance_eval do have_rakefile end)
+    assert(@app.instance_eval do have_project_rakefile end)
     assert_equal '', @app.rakefile
   end
 
@@ -268,6 +282,29 @@ class TestApplication < Test::Unit::TestCase
     ARGV.clear
   end
 
+  private
+
+  def set_env(settings)
+    result = {}
+    settings.each do |k, v|
+      result[k] = ENV[k]
+      if k == 'PWD'
+        Dir.chdir(v)
+      else
+        ENV[k] = v
+      end
+    end
+    result
+  end
+
+  def in_environment(settings)
+    original_dir = Dir.pwd
+    original_settings = set_env(settings)
+    yield    
+  ensure
+    set_env(original_settings)
+  end
+
 end
 
 
@@ -279,6 +316,7 @@ class TestApplicationOptions < Test::Unit::TestCase
     clear_argv
     RakeFileUtils.verbose_flag = false
     RakeFileUtils.nowrite_flag = false
+    TESTING_REQUIRE.clear
   end
 
   def teardown
@@ -322,6 +360,18 @@ class TestApplicationOptions < Test::Unit::TestCase
       assert opts.trace
       assert RakeFileUtils.verbose_flag
       assert ! RakeFileUtils.nowrite_flag
+    end
+  end
+
+  def test_system_option
+    flags('--system', '-G') do |opts|
+      assert opts.load_system
+    end
+  end
+
+  def test_no_system_option
+    flags('--no-system', '-g') do |opts|
+      assert opts.ignore_system
     end
   end
 
