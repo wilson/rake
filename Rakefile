@@ -16,7 +16,7 @@ require 'rake/clean'
 require 'rake/testtask'
 require 'rake/rdoctask'
 
-CLEAN.include('**/*.o', '*.dot')
+CLEAN.include('**/*.o', '*.dot', '**/.*.rbc')
 CLOBBER.include('doc/example/main', 'testdata')
 CLOBBER.include('test/data/**/temp_*')
 CLOBBER.include('test/data/chains/play.*')
@@ -95,9 +95,13 @@ begin
 
   Rcov::RcovTask.new do |t|
     t.libs << "test"
+    dot_rakes = 
     t.rcov_opts = [
-      '-xRakefile', '-xrakefile', '-xpublish.rf', '--text-report',
-    ]
+      '-xRakefile', '-xrakefile', '-xpublish.rf',
+      '-xlib/rake/contrib', '-x/Library', 
+      '--text-report',
+      '--sort coverage'
+    ] + FileList['rakelib/*.rake'].pathmap("-x%p")
     t.test_files = FileList[
       'test/test*.rb', 'test/functional.rb'
     ]
@@ -126,13 +130,11 @@ end
 
 rd = Rake::RDocTask.new("rdoc") { |rdoc|
   rdoc.rdoc_dir = 'html'
-#  rdoc.template = 'kilmer'
-#  rdoc.template = 'css2'
   rdoc.template = 'doc/jamis.rb'
   rdoc.title    = "Rake -- Ruby Make"
   rdoc.options << '--line-numbers' << '--inline-source' <<
-    '--main' << 'README' <<
-    '--title' <<  'Rake -- Ruby Make' 
+    '--main'  << 'README' <<
+    '--title' << 'Rake -- Ruby Make'
   rdoc.rdoc_files.include('README', 'MIT-LICENSE', 'TODO', 'CHANGES')
   rdoc.rdoc_files.include('lib/**/*.rb', 'doc/**/*.rdoc')
   rdoc.rdoc_files.exclude(/\bcontrib\b/)

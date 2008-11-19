@@ -1,6 +1,38 @@
 
 = Rake Changelog
 
+== Version 0.8.4
+
+* Preserve case when locating rakefiles (patch from James
+  M. Lawrence/quix)
+
+* Better support for windows paths in the test task (patch from Simon
+  Chiang/bahuvrihi)
+
+* Windows system dir search order is now: HOME, HOMEDRIVE + HOMEPATH,
+  APPDATA, USERPROFILE (patch from Luis Lavena)
+
+* MingGW is now recognized as a windows platform.  (patch from Luis
+  Lavena)
+
+* Numerous fixes to the windows test suite (patch from Luis Lavena).
+
+* Improved Rakefile case insensitivity testing (patch from Luis
+  Lavena).
+
+* Fixed stray ARGV option problem that was interfering with
+  Test::Unit::Runner.
+
+== Version 0.8.3
+
+* Enhanced the system directory detection in windows. We now check
+  HOMEDRIVE/HOMEPATH and USERPROFILE if APPDATA isn't found. (Patch
+  supplied by James Tucker). Rake no long aborts if it can't find the
+  directory.
+
+* Added fix to handle ruby installations in directories with spaces in
+  their name.  
+
 == Version 0.8.2
 
 * Fixed bug in package task so that it will include the subdir
@@ -52,6 +84,10 @@
 * The -T output will only self-truncate if the output is a tty.
   However, if RAKE_COLUMNS is explicitly set, it will be honored in
   any case. (Patch provided by Gavin Stark).
+
+* Numerous fixes for running under windows. A big thanks to Bheeshmar
+  Redheendran for spending a good part of the afternoon at the
+  Lonestar Ruby Conference to help me work out these issues.
 
 == Version 0.8.1
 

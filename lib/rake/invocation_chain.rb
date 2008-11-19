@@ -1,5 +1,4 @@
 module Rake
-  EMPTY_TASK_ARGS = TaskArguments.new([], [])
 
   ####################################################################
   # InvocationChain tracks the chain of task invocations to detect
@@ -50,4 +49,5 @@ module Rake
     EMPTY = EmptyInvocationChain.new
 
   end # class InvocationChain
-end # module Rake
+end
+

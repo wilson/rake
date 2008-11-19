@@ -3,7 +3,8 @@
 # added to the FileUtils utility functions.
 #
 module FileUtils
-  RUBY = File.join(Config::CONFIG['bindir'], Config::CONFIG['ruby_install_name'])
+  RUBY = File.join(Config::CONFIG['bindir'], Config::CONFIG['ruby_install_name']).
+    sub(/.*\s.*/m, '"\&"')
 
   OPT_TABLE['sh']  = %w(noop verbose)
   OPT_TABLE['ruby'] = %w(noop verbose)
@@ -43,10 +44,19 @@ module FileUtils
     rake_check_options options, :noop, :verbose
     rake_output_message cmd.join(" ") if options[:verbose]
     unless options[:noop]
-      res = system(*cmd)
+      res = rake_system(*cmd)
       block.call(res, $?)
     end
   end
+
+  def rake_system(*cmd)
+    if Rake::Win32.windows?
+      Rake::Win32.rake_system(*cmd)
+    else
+      system(*cmd)
+    end
+  end
+  private :rake_system
 
   # Run a Ruby interpreter with the given arguments.
   #
@@ -104,6 +114,9 @@ module RakeFileUtils
   end
   RakeFileUtils.verbose_flag = :default
   RakeFileUtils.nowrite_flag = false
+
+  $fileutils_verbose = true
+  $fileutils_nowrite = false
 
   FileUtils::OPT_TABLE.each do |name, opts|
     default_options = []
@@ -228,5 +241,4 @@ end
 include RakeFileUtils
 private(*FileUtils.instance_methods(false))
 private(*RakeFileUtils.instance_methods(false))
-
 

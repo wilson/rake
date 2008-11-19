@@ -4,11 +4,13 @@ require 'test/unit'
 require 'fileutils'
 require 'rake'
 require 'test/filecreation'
+require 'test/rake_test_setup'
 
 ######################################################################
 class TestFileTask < Test::Unit::TestCase
   include Rake
   include FileCreation
+  include TestMethods
 
   def setup
     Task.clear
@@ -118,22 +120,24 @@ class TestDirectoryTask < Test::Unit::TestCase
     assert ! File.exist?("testdata/a/b/c")
   end
 
-  def test_directory_win32
-    desc "WIN32 DESC"
-    FileUtils.mkdir_p("testdata")
-    Dir.chdir("testdata") do
-      directory 'c:/testdata/a/b/c'
-      assert_equal FileCreationTask, Task['c:/testdata'].class
-      assert_equal FileCreationTask, Task['c:/testdata/a'].class
-      assert_equal FileCreationTask, Task['c:/testdata/a/b/c'].class
-      assert_nil             Task['c:/testdata'].comment
-      assert_equal "WIN32 DESC",   Task['c:/testdata/a/b/c'].comment
-      assert_nil             Task['c:/testdata/a/b'].comment
-      verbose(false) {
-        Task['c:/testdata/a/b'].invoke
-      }
-      assert File.exist?('c:/testdata/a/b')
-      assert ! File.exist?('c:/testdata/a/b/c')
+  if Rake::Win32.windows?
+    def test_directory_win32
+      desc "WIN32 DESC"
+      FileUtils.mkdir_p("testdata")
+      Dir.chdir("testdata") do
+        directory 'c:/testdata/a/b/c'
+        assert_equal FileCreationTask, Task['c:/testdata'].class
+        assert_equal FileCreationTask, Task['c:/testdata/a'].class
+        assert_equal FileCreationTask, Task['c:/testdata/a/b/c'].class
+        assert_nil             Task['c:/testdata'].comment
+        assert_equal "WIN32 DESC",   Task['c:/testdata/a/b/c'].comment
+        assert_nil             Task['c:/testdata/a/b'].comment
+        verbose(false) {
+          Task['c:/testdata/a/b'].invoke
+        }
+        assert File.exist?('c:/testdata/a/b')
+        assert ! File.exist?('c:/testdata/a/b/c')
+      end
     end
   end
 end

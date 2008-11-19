@@ -1,6 +1,7 @@
 require 'rake/cloneable'
 
 module Rake
+
   # #########################################################################
   # A FileList is essentially an array with a few helper methods defined to
   # make file manipulation a bit easier.
@@ -373,7 +374,6 @@ module Rake
     DEFAULT_IGNORE_PROCS = [
       proc { |fn| fn =~ /(^|[\/\\])core$/ && ! File.directory?(fn) }
     ]
-#    @exclude_patterns = DEFAULT_IGNORE_PATTERNS.dup
 
     def import(array)
       @items = array
@@ -388,8 +388,8 @@ module Rake
         new(*args)
       end
     end
-  end # class Rake::FileList
-end # module Rake
+  end # FileList
+end
 
 # Alias FileList to be available at the top level.
 FileList = Rake::FileList

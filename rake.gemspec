@@ -1,7 +1,7 @@
 --- !ruby/object:Gem::Specification 
 name: rake
 version: !ruby/object:Gem::Version 
-  version: 0.8.1.7
+  version: 0.8.3.99
 platform: ruby
 authors: 
 - Jim Weirich
@@ -9,7 +9,7 @@ autorequire:
 bindir: bin
 cert_chain: []
 
-date: 2008-08-24 00:00:00 -04:00
+date: 2008-11-01 00:00:00 -04:00
 default_executable: rake
 dependencies: []
 
@@ -24,6 +24,7 @@ extra_rdoc_files:
 - MIT-LICENSE
 - TODO
 - CHANGES
+- doc/command_line_usage.rdoc
 - doc/glossary.rdoc
 - doc/proto_rake.rdoc
 - doc/rakefile.rdoc
@@ -40,6 +41,8 @@ extra_rdoc_files:
 - doc/release_notes/rake-0.7.3.rdoc
 - doc/release_notes/rake-0.8.0.rdoc
 - doc/release_notes/rake-0.8.2.rdoc
+- doc/release_notes/rake-0.8.3.rdoc
+- doc/release_notes/rake-0.8.4.rdoc
 files: 
 - install.rb
 - CHANGES
@@ -66,13 +69,16 @@ files:
 - lib/rake/runtest.rb
 - lib/rake/tasklib.rb
 - lib/rake/testtask.rb
+- lib/rake/win32.rb
 - lib/rake.rb
 - test/capture_stdout.rb
-- test/contrib/testsys.rb
+- test/check_expansion.rb
+- test/contrib/test_sys.rb
 - test/data/rakelib/test1.rb
 - test/data/rbext/rakefile.rb
 - test/filecreation.rb
 - test/functional.rb
+- test/in_environment.rb
 - test/rake_test_setup.rb
 - test/reqfile.rb
 - test/reqfile2.rb
@@ -95,13 +101,16 @@ files:
 - test/test_package_task.rb
 - test/test_pathmap.rb
 - test/test_rake.rb
+- test/test_rdoc_task.rb
 - test/test_require.rb
 - test/test_rules.rb
 - test/test_task_arguments.rb
 - test/test_task_manager.rb
+- test/test_tasklib.rb
 - test/test_tasks.rb
 - test/test_test_task.rb
 - test/test_top_level_functions.rb
+- test/test_win32.rb
 - test/data/imports/deps.mf
 - test/data/sample.mf
 - test/data/chains/Rakefile
@@ -114,6 +123,7 @@ files:
 - test/data/statusreturn/Rakefile
 - test/data/unittest/Rakefile
 - test/data/unittest/subdir
+- doc/command_line_usage.rdoc
 - doc/example
 - doc/example/a.c
 - doc/example/b.c
@@ -139,6 +149,8 @@ files:
 - doc/release_notes/rake-0.7.3.rdoc
 - doc/release_notes/rake-0.8.0.rdoc
 - doc/release_notes/rake-0.8.2.rdoc
+- doc/release_notes/rake-0.8.3.rdoc
+- doc/release_notes/rake-0.8.4.rdoc
 has_rdoc: true
 homepage: http://rake.rubyforge.org
 post_install_message: 

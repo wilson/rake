@@ -33,13 +33,14 @@ module Rake
       super
       @name = 'rake'
       @rakefiles = DEFAULT_RAKEFILES.dup
-      @rakefile = ''
+      @rakefile = nil
       @pending_imports = []
       @imported = []
       @loaders = {}
       @default_loader = Rake::DefaultLoader.new
       @original_dir = Dir.pwd
       @top_level_tasks = []
+      add_loader('rb', DefaultLoader.new)
       add_loader('rf', DefaultLoader.new)
       add_loader('rake', DefaultLoader.new)
       @tty_output = STDOUT.tty?
@@ -66,7 +67,8 @@ module Rake
     def init(app_name='rake')
       standard_exception_handling do
         @name = app_name
-        collect_tasks handle_options
+        handle_options
+        collect_tasks
       end
     end
 
@@ -101,8 +103,6 @@ module Rake
     def options
       @options ||= OpenStruct.new
     end
-
-    # private ----------------------------------------------------------------
 
     def invoke_task(task_string)
       name, args = parse_task_string(task_string)
@@ -147,14 +147,16 @@ module Rake
 
     # True if one of the files in RAKEFILES is in the current directory.
     # If a match is found, it is copied into @rakefile.
-    def have_project_rakefile
+    def have_rakefile
       @rakefiles.each do |fn|
-        if File.exist?(fn) || fn == ''
-          @rakefile = fn
-          return true
+        if File.exist?(fn)
+          others = Dir.glob(fn, File::FNM_CASEFOLD)
+          return others.size == 1 ? others.first : fn
+        elsif fn == ''
+          return fn
         end
       end
-      return false
+      return nil
     end
 
     # True if we are outputting to TTY, false otherwise
@@ -221,11 +223,11 @@ module Rake
     end
 
     def unix?
-      RUBY_PLATFORM =~ /(aix|darwin|linux|(net|free|open)bsd|cygwin|solaris|irix|hpux|)/i
+      RUBY_PLATFORM =~ /(aix|darwin|linux|(net|free|open)bsd|cygwin|solaris|irix|hpux)/i
     end
 
     def windows?
-      Config::CONFIG['host_os'] =~ /mswin/
+      Win32.windows?
     end
 
     def truncate(string, width)
@@ -244,16 +246,10 @@ module Rake
       end
     end
 
-    # Return a list of the command line options supported by the
-    # program.
-    def command_line_options
-      OPTIONS.collect { |lst| lst[0..-2] }
-    end
-
-    # Read and handle the command line options.
-    def handle_options
-      # optparse version of OPTIONS
-      op_options = [
+    # A list of all the standard options used in rake, suitable for
+    # passing to OptionParser.
+    def standard_rake_options
+      [
         ['--classic-namespace', '-C', "Put Task and FileTask in the top level namespace",
           lambda { |value|
             require 'rake/classic_namespace'
@@ -287,21 +283,12 @@ module Rake
             exit
           }
         ],
-        ['--execute-continue',  '-E',
+        ['--execute-continue',  '-E CODE',
           "Execute some Ruby code, then continue with normal task processing.",
           lambda { |value| eval(value) }            
         ],
         ['--libdir', '-I LIBDIR', "Include LIBDIR in the search path for required modules.",
           lambda { |value| $:.push(value) }
-        ],
-        ['--system',  '-G', "Run tasks using system wide (global) rakefiles (usually '~/.rake/*.rake'). Project Rakefiles are ignored.",
-          lambda { |value| options.load_system = true }
-        ],
-        ['--no-system',  '-g', "Run tasks using standard project Rakefile search paths, ignoring system wide rakefiles.",
-          lambda { |value| options.ignore_system = true }
-        ],
-        ['--nosearch', '-N', "Do not search parent directories for the Rakefile.",
-          lambda { |value| options.nosearch = true }
         ],
         ['--prereqs', '-P', "Display the tasks and dependencies, then exit.",
           lambda { |value| options.show_prereqs = true }
@@ -336,11 +323,22 @@ module Rake
         ['--rules', "Trace the rules resolution.",
           lambda { |value| options.trace_rules = true }
         ],
+        ['--no-search', '--nosearch', '-N', "Do not search parent directories for the Rakefile.",
+          lambda { |value| options.nosearch = true }
+        ],
         ['--silent', '-s', "Like --quiet, but also suppresses the 'in directory' announcement.",
           lambda { |value|
             verbose(false)
             options.silent = true
           }
+        ],
+        ['--system',  '-g',
+          "Using system wide (global) rakefiles (usually '~/.rake/*.rake').",
+          lambda { |value| options.load_system = true }
+        ],
+        ['--no-system', '--nosystem', '-G',
+          "Use standard project Rakefile search paths, ignore system wide rakefiles.",
+          lambda { |value| options.ignore_system = true }
         ],
         ['--tasks', '-T [PATTERN]', "Display the tasks (matching optional PATTERN) with descriptions, then exit.",
           lambda { |value|
@@ -363,16 +361,15 @@ module Rake
             puts "rake, version #{RAKEVERSION}"
             exit
           }
-        ],
+        ]
       ]
+    end
 
+    # Read and handle the command line options.
+    def handle_options
       options.rakelib = ['rakelib']
 
-      # opts = GetoptLong.new(*command_line_options)
-      # opts.each { |opt, value| do_option(opt, value) }
-
-      parsed_argv = nil
-      opts = OptionParser.new do |opts|
+      OptionParser.new do |opts|
         opts.banner = "rake [-f rakefile] {options} targets..."
         opts.separator ""
         opts.separator "Options are ..."
@@ -382,9 +379,8 @@ module Rake
           exit
         end
 
-        op_options.each { |args| opts.on(*args) }
-        parsed_argv = opts.parse(ARGV)
-      end
+        standard_rake_options.each { |args| opts.on(*args) }
+      end.parse!
 
       # If class namespaces are requested, set the global options
       # according to the values in the options structure.
@@ -395,9 +391,6 @@ module Rake
         $dryrun = options.dryrun
         $silent = options.silent
       end
-      return parsed_argv
-    rescue NoMethodError => ex
-      raise OptionParser::InvalidOption, "While parsing options, error = #{ex.class}:#{ex.message}"
     end
 
     # Similar to the regular Ruby +require+ command, but will check
@@ -416,43 +409,63 @@ module Rake
       fail LoadError, "Can't find #{file_name}"
     end
 
-    def raw_load_rakefile # :nodoc:
+    def find_rakefile_location
       here = Dir.pwd
-      if (options.load_system || ! have_project_rakefile) && ! options.ignore_system && have_system_rakefiles
-        Dir["#{system_dir}/*.rake"].each do |name|
+      while ! (fn = have_rakefile)
+        Dir.chdir("..")
+        if Dir.pwd == here || options.nosearch
+          return nil
+        end
+        here = Dir.pwd
+      end
+      [fn, here]
+    ensure
+      Dir.chdir(Rake.original_dir)
+    end
+
+    def raw_load_rakefile # :nodoc:
+      rakefile, location = find_rakefile_location
+      if (! options.ignore_system) &&
+          (options.load_system || rakefile.nil?) &&
+          system_dir && File.directory?(system_dir)
+        puts "(in #{Dir.pwd})" unless options.silent
+        glob("#{system_dir}/*.rake") do |name|
           add_import name
         end
       else
-        while ! have_project_rakefile
-          Dir.chdir("..")
-          if Dir.pwd == here || options.nosearch
-            fail "No Rakefile found (looking for: #{@rakefiles.join(', ')})"
+        fail "No Rakefile found (looking for: #{@rakefiles.join(', ')})" if
+          rakefile.nil?
+        @rakefile = rakefile
+        Dir.chdir(location)
+        puts "(in #{Dir.pwd})" unless options.silent
+        $rakefile = @rakefile if options.classic_namespace
+        load File.expand_path(@rakefile) if @rakefile && @rakefile != ''
+        options.rakelib.each do |rlib|
+          glob("#{rlib}/*.rake") do |name|
+            add_import name
           end
-          here = Dir.pwd
         end
-      end
-      puts "(in #{Dir.pwd})" unless options.silent
-      $rakefile = @rakefile
-      load File.expand_path(@rakefile) unless @rakefile.empty?
-      options.rakelib.each do |rlib|
-        Dir["#{rlib}/*.rake"].each do |name| add_import name end
       end
       load_imports
     end
 
-    def have_system_rakefiles
-      Dir[File.join(system_dir, '*.rake')].size > 0
+    def glob(path, &block)
+      Dir[path.gsub("\\", '/')].each(&block)
     end
+    private :glob
 
-    # The directory containing the system-wide Rakefiles
+    # The directory path containing the system wide rakefiles.
     def system_dir
-      if ENV['RAKE_SYSTEM']
-        ENV['RAKE_SYSTEM']
-      elsif windows?
-        win32_system_dir
-      else
-        standard_system_dir
-      end
+      @system_dir ||=
+        begin
+          if ENV['RAKE_SYSTEM']
+            ENV['RAKE_SYSTEM']
+          elsif Win32.windows?
+            Win32.win32_system_dir
+          else
+            standard_system_dir
+          end
+        end
     end
 
     # The standard directory containing system wide rake files.
@@ -460,24 +473,13 @@ module Rake
       File.join(File.expand_path('~'), '.rake')
     end
     private :standard_system_dir
-    
-    # The standard directory containing system wide rake files on Win
-    # 32 systems.
-    def win32_system_dir #:nodoc:
-      unless File.exists?(win32home = File.join(ENV['APPDATA'], 'Rake'))
-        raise Win32HomeError, "# Unable to determine home path environment variable."
-      else
-        win32home
-      end
-    end
-    private :win32_system_dir
 
     # Collect the list of tasks on the command line.  If no tasks are
     # given, return a list containing only the default task.
     # Environmental assignments are processed at this time as well.
-    def collect_tasks(argv)
+    def collect_tasks
       @top_level_tasks = []
-      argv.each do |arg|
+      ARGV.each do |arg|
         if arg =~ /^(\w+)=(.*)$/
           ENV[$1] = $2
         else
@@ -506,18 +508,6 @@ module Rake
       end
     end
 
-    # Warn about deprecated use of top level constant names.
-    def const_warning(const_name)
-      @const_warning ||= false
-      if ! @const_warning
-        $stderr.puts %{WARNING: Deprecated reference to top-level constant '#{const_name}' } +
-          %{found at: #{rakefile_location}} # '
-        $stderr.puts %{    Use --classic-namespace on rake command}
-        $stderr.puts %{    or 'require "rake/classic_namespace"' in Rakefile}
-      end
-      @const_warning = true
-    end
-
     def rakefile_location
       begin
         fail
@@ -525,5 +515,5 @@ module Rake
         ex.backtrace.find {|str| str =~ /#{@rakefile}/ } || ""
       end
     end
-  end # class Rake::Application
+  end # class Application
 end # module Rake

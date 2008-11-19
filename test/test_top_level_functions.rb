@@ -7,12 +7,14 @@ rescue LoadError
 end
 
 require 'test/unit'
-require 'test/capture_stdout'
-require 'rake'
 require 'flexmock/test_unit'
+require 'test/capture_stdout'
+require 'test/rake_test_setup'
+require 'rake'
 
 class TestTopLevelFunctions < Test::Unit::TestCase
   include CaptureStdout
+  include TestMethods
 
   def setup
     super
@@ -57,5 +59,4 @@ class TestTopLevelFunctions < Test::Unit::TestCase
   ensure
     RakeFileUtils.nowrite_flag = false
   end
-
 end

@@ -5,16 +5,22 @@ module Ruby19
   RELEASE_FILES = FileList['bin/rake', 'lib/rake.rb', 'lib/rake/**/*']
   RELEASE_FILES.exclude('lib/rake/lib', 'project.rake', 'lib/rake/plugins', 'lib/rake/contrib')
 
-  SVN = "../thirdparty/ruby"
+  SVN = "#{ENV['HOME']}/working/svn/software/thirdparty/ruby"
 
-  def run_tests(files)
-    sh "#{PROG} -Ilib lib/rake/rake_test_loader.rb #{files}"
+  def run_tests(files, opts='')
+    sh "#{PROG} -Ilib lib/rake/rake_test_loader.rb #{opts} #{files}"
   end
 
   extend self
 end
 
 namespace "ruby19" do
+  desc "Generate a diff file between the primary repo and Ruby 1.9"
+  task :diff => [:check_svn] do
+    sh %{diff -u #{Ruby19::SVN}/lib/rake.rb lib/rake.rb}
+    sh %{diff -u -x .svn -x contrib -x lib #{Ruby19::SVN}/lib/rake lib/rake}
+  end
+
   desc "Ruby Release Files"
   task :release_files do
     puts Ruby19::RELEASE_FILES
@@ -41,7 +47,7 @@ namespace "ruby19" do
       File.directory?(Ruby19::SVN) 
   end
 
-  
+
   namespace "test" do
 
     desc "Check the file paths"
@@ -58,24 +64,25 @@ namespace "ruby19" do
     task :version => [:env19] do
       sh "#{Ruby19::PROG} --version", :verbose => false
       sh "#{Ruby19::PROG} -rubygems -e 'puts \"Gem Path = \#{Gem.path}\"'", :verbose => false
+      sh "#{Ruby19::PROG} -Ilib bin/rake --version"
     end
 
     desc "Run the unit tests in Ruby 1.9"
-    task :units => [:env19] do
-      test_files = FileList['test/test_*.rb']
-      Ruby19.run_tests(test_files)
+    task :units, :opts, :needs => [:env19] do |t, args|
+      test_files = FileList['test/**/test_*.rb']
+      Ruby19.run_tests(test_files, args.opts)
     end
 
     desc "Run the functional tests in Ruby 1.9"
-    task :functionals => [:env19] do
+    task :functionals, :opts, :needs => [:env19] do |t, args|
       test_files = FileList['test/functional.rb']
-      Ruby19.run_tests(test_files)
+      Ruby19.run_tests(test_files, args.opts)
     end
 
     desc "Run the all the tests in Ruby 1.9"
-    task :all => [:env19] do
-      test_files = FileList['test/functional.rb', 'test/test_*.rb']
-      Ruby19.run_tests(test_files)
+    task :all, :opts, :needs => [:env19] do |t, args|
+      test_files = FileList['test/functional.rb', 'test/**/test_*.rb']
+      Ruby19.run_tests(test_files, args.opts)
     end
   end
 end

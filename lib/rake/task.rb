@@ -1,5 +1,4 @@
 module Rake
-
   # #########################################################################
   # A Task is the basic unit of work in a Rakefile.  Tasks have associated
   # actions (possibly more than one) and a list of prerequisites.  When
@@ -248,13 +247,9 @@ module Rake
       return result
     end
 
-    # ----------------------------------------------------------------
-    # Rake Module Methods
-    #
     class << self
-
-      # Clear the task list.  This cause rake to immediately forget all the
-      # tasks that have been assigned.  (Normally used in the unit tests.)
+      # Clear the task list. This cause rake to immediately forget all the
+      # tasks that have been assigned. (Normally used in the unit tests.)
       def clear
         Rake.application.clear
       end
@@ -264,8 +259,8 @@ module Rake
         Rake.application.tasks
       end
 
-      # Return a task with the given name.  If the task is not currently
-      # known, try to synthesize one from the defined rules.  If no rules are
+      # Return a task with the given name. If the task is not currently
+      # known, try to synthesize one from the defined rules. If no rules are
       # found, but an existing file matches the task name, assume it is a file
       # task with no dependencies or actions.
       def [](task_name)
@@ -277,9 +272,9 @@ module Rake
         Rake.application.lookup(task_name) != nil
       end
 
-      # Define a task given +args+ and an option block.  If a rule with the
+      # Define a task given +args+ and an option block. If a rule with the
       # given name already exists, the prerequisites and actions are added to
-      # the existing task.  Returns the defined task.
+      # the existing task. Returns the defined task.
       def define_task(*args, &block)
         Rake.application.define_task(self, *args, &block)
       end
@@ -290,12 +285,11 @@ module Rake
       end
 
       # Apply the scope to the task name according to the rules for
-      # this kind of task.  Generic tasks will accept the scope as
+      # this kind of task. Generic tasks will accept the scope as
       # part of the name.
       def scope_name(scope, task_name)
         (scope + [task_name]).join(':')
       end
-
     end # class << Rake::Task
   end # class Rake::Task
 end # module Rake

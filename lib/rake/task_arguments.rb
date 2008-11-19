@@ -57,9 +57,9 @@ module Rake
     def inspect
       to_s
     end
-    
+
     protected
-    
+
     def lookup(name)
       if @hash.has_key?(name)
         @hash[name]
@@ -72,4 +72,6 @@ module Rake
       end
     end
   end
+
+  EMPTY_TASK_ARGS = TaskArguments.new([], [])
 end

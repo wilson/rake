@@ -29,10 +29,9 @@
 # as a library via a require statement, but it can be distributed
 # independently as an application.
 
-RAKEVERSION = '0.8.1.7'
+RAKEVERSION = '0.8.3.99'
 
 require 'rbconfig'
-require 'getoptlong'
 require 'fileutils'
 require 'singleton'
 require 'monitor'
@@ -52,10 +51,9 @@ require 'rake/task_manager'
 require 'rake/namespace'
 require 'rake/application'
 require 'rake/toplevel_methods'
+require 'rake/win32'
 
-##############################################################################
 module Rake
-
   # --------------------------------------------------------------------------
   # Rake module singleton methods.
   #
@@ -76,7 +74,7 @@ module Rake
     end
 
     # Yield each file or directory component.
-    def each_dir_parent(dir)
+    def each_dir_parent(dir)    # :nodoc:
       old_length = nil
       while dir != '.' && dir.length != old_length
         yield(dir)
@@ -85,5 +83,5 @@ module Rake
       end
     end
   end
-
 end # module Rake
+

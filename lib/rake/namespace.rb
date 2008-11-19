@@ -1,4 +1,5 @@
 module Rake
+
   ####################################################################
   # The NameSpace class will lookup task names in the the scope
   # defined by a +namespace+ command.
@@ -17,10 +18,10 @@ module Rake
       @task_manager.lookup(name, @scope)
     end
 
-    # Return the list of tasks defined in this namespace.
+    # Return the list of tasks defined in this and nested namespaces.
     def tasks
-      @task_manager.tasks
+      @task_manager.tasks_in_scope(@scope)
     end
-  end # NameSpace
+  end # class NameSpace
 end
 

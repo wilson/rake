@@ -10,23 +10,19 @@ require 'test/unit'
 require 'rake'
 require 'test/rake_test_setup'
 require 'test/capture_stdout'
+require 'test/in_environment'
 
 TESTING_REQUIRE = [ ]
 
 ######################################################################
 class TestApplication < Test::Unit::TestCase
   include CaptureStdout
+  include InEnvironment
+  include TestMethods
 
   def setup
     @app = Rake::Application.new
     @app.options.rakelib = []
-  end
-
-  def test_constant_warning
-    err = capture_stderr do @app.instance_eval { const_warning("Task") } end
-    assert_match(/warning/i, err)
-    assert_match(/deprecated/i, err)
-    assert_match(/Task/i, err)
   end
 
   def test_display_tasks
@@ -39,29 +35,27 @@ class TestApplication < Test::Unit::TestCase
   end
 
   def test_display_tasks_with_long_comments
-    ENV['RAKE_COLUMNS'] = '80'
-    @app.options.show_task_pattern = //
-    @app.last_description = "1234567890" * 8
-    @app.define_task(Rake::Task, "t")
-    out = capture_stdout do @app.instance_eval { display_tasks_and_comments } end
-    assert_match(/^rake t/, out)
-    assert_match(/# 12345678901234567890123456789012345678901234567890123456789012345\.\.\./, out)
-  ensure
-    ENV['RAKE_COLUMNS'] = nil
+    in_environment('RAKE_COLUMNS' => '80') do
+      @app.options.show_task_pattern = //
+      @app.last_description = "1234567890" * 8
+      @app.define_task(Rake::Task, "t")
+      out = capture_stdout do @app.instance_eval { display_tasks_and_comments } end
+      assert_match(/^rake t/, out)
+      assert_match(/# 12345678901234567890123456789012345678901234567890123456789012345\.\.\./, out)
+    end
   end
 
   def test_display_tasks_with_task_name_wider_than_tty_display
-    ENV['RAKE_COLUMNS'] = '80'
-    @app.options.show_task_pattern = //
-    description = "something short"
-    task_name = "task name" * 80
-    @app.last_description = "something short"
-    @app.define_task(Rake::Task, task_name )
-    out = capture_stdout do @app.instance_eval { display_tasks_and_comments } end
-    # Ensure the entire task name is output and we end up showing no description
-    assert_match(/rake #{task_name}  # .../, out)
-  ensure
-    ENV['RAKE_COLUMNS'] = nil
+    in_environment('RAKE_COLUMNS' => '80') do
+      @app.options.show_task_pattern = //
+      description = "something short"
+      task_name = "task name" * 80
+      @app.last_description = "something short"
+      @app.define_task(Rake::Task, task_name )
+      out = capture_stdout do @app.instance_eval { display_tasks_and_comments } end
+      # Ensure the entire task name is output and we end up showing no description
+      assert_match(/rake #{task_name}  # .../, out)
+    end
   end
 
   def test_display_tasks_with_very_long_task_name_to_a_non_tty_shows_name_and_comment
@@ -87,16 +81,15 @@ class TestApplication < Test::Unit::TestCase
   end
 
   def test_display_tasks_with_long_comments_to_a_non_tty_with_columns_set_truncates_comments
-    ENV['RAKE_COLUMNS'] = '80'
-    @app.options.show_task_pattern = //
-    @app.tty_output = false
-    @app.last_description = "1234567890" * 8
-    @app.define_task(Rake::Task, "t")
-    out = capture_stdout do @app.instance_eval { display_tasks_and_comments } end
-    assert_match(/^rake t/, out)
-    assert_match(/# 12345678901234567890123456789012345678901234567890123456789012345\.\.\./, out)
-  ensure
-    ENV['RAKE_COLUMNS'] = nil
+    in_environment("RAKE_COLUMNS" => '80') do
+      @app.options.show_task_pattern = //
+      @app.tty_output = false
+      @app.last_description = "1234567890" * 8
+      @app.define_task(Rake::Task, "t")
+      out = capture_stdout do @app.instance_eval { display_tasks_and_comments } end
+      assert_match(/^rake t/, out)
+      assert_match(/# 12345678901234567890123456789012345678901234567890123456789012345\.\.\./, out)
+    end
   end
 
   def test_display_tasks_with_full_descriptions
@@ -110,53 +103,46 @@ class TestApplication < Test::Unit::TestCase
   end
 
   def test_finding_rakefile
-    assert @app.instance_eval { have_project_rakefile }
-    assert_equal "rakefile", @app.rakefile.downcase
+    assert_match(/Rakefile/i, @app.instance_eval { have_rakefile })
   end
 
   def test_not_finding_rakefile
     @app.instance_eval { @rakefiles = ['NEVER_FOUND'] }
-    assert( ! @app.instance_eval do have_project_rakefile end )
-    assert_equal '', @app.rakefile
+    assert( ! @app.instance_eval do have_rakefile end )
+    assert_nil @app.rakefile
   end
 
   def test_load_rakefile
-    original_dir = Dir.pwd
-    Dir.chdir("test/data/unittest")
-    @app.instance_eval do 
-      handle_options
-      options.silent = true
-      options.ignore_system = true
-      load_rakefile
+    in_environment("PWD" => "test/data/unittest") do
+      @app.instance_eval do 
+        handle_options
+        options.silent = true
+        load_rakefile
+      end
+      assert_equal "rakefile", @app.rakefile.downcase
+      assert_match(%r(unittest$), Dir.pwd)
     end
-    assert_equal "rakefile", @app.rakefile.downcase
-    assert_match(%r(unittest$), Dir.pwd)
-  ensure
-    Dir.chdir(original_dir)
   end
 
   def test_load_rakefile_from_subdir
-    original_dir = Dir.pwd
-    Dir.chdir("test/data/unittest/subdir")
-    @app.instance_eval do
-      handle_options
-      options.silent = true
-      load_rakefile
-    end
-    assert_equal "rakefile", @app.rakefile.downcase
-    assert_match(%r(unittest$), Dir.pwd)
-  ensure
-    Dir.chdir(original_dir)
-  end
-
-  def test_load_rakefile_not_found
-    in_environment("PWD" => "/") do
+    in_environment("PWD" => "test/data/unittest/subdir") do
       @app.instance_eval do
         handle_options
         options.silent = true
-        options.ignore_system = true
+        load_rakefile
       end
-      ex = assert_raise(RuntimeError) do 
+      assert_equal "rakefile", @app.rakefile.downcase
+      assert_match(%r(unittest$), Dir.pwd)
+    end
+  end
+
+  def test_load_rakefile_not_found
+    in_environment("PWD" => "/", "RAKE_SYSTEM" => 'not_exist') do
+      @app.instance_eval do
+        handle_options
+        options.silent = true
+      end
+      ex = assert_exception(RuntimeError) do 
         @app.instance_eval do raw_load_rakefile end 
       end
       assert_match(/no rakefile found/i, ex.message)
@@ -164,23 +150,60 @@ class TestApplication < Test::Unit::TestCase
   end
 
   def test_load_from_system_rakefile
-    in_environment('RAKE_SYSTEM' => 'test') do
+    in_environment('RAKE_SYSTEM' => 'test/data/sys') do
       @app.options.rakelib = []
       @app.instance_eval do
         handle_options
         options.silent = true
         options.load_system = true
+        options.rakelib = []
         load_rakefile
       end
-      assert_equal "test", @app.system_dir
-      assert_equal '', @app.rakefile
+      assert_equal "test/data/sys", @app.system_dir
+      assert_nil @app.rakefile
     end
   end
 
-  def test_not_caring_about_finding_rakefile
-    @app.instance_eval do @rakefiles = [''] end
-    assert(@app.instance_eval do have_project_rakefile end)
-    assert_equal '', @app.rakefile
+  def test_load_from_system_rakefile_on_unix
+    flexmock(Rake::Win32, :windows? => false,
+      :win32_system_dir => nil)
+    flexmock(@app, :load => nil)
+    flexmock(File).should_receive(:expand_path).with("~").and_return("/HOME")
+    flexmock(File).should_receive(:expand_path).and_return { |fn| fn }
+
+    in_environment('RAKE_SYSTEM' => nil) do
+      @app.options.rakelib = []
+      @app.instance_eval do
+        handle_options
+        options.silent = true
+        options.load_system = true
+        options.rakelib = []
+        load_rakefile
+      end
+      assert_equal "/HOME/.rake", @app.system_dir
+    end
+  end
+
+  def test_windows
+    assert ! (@app.windows? && @app.unix?)
+  end
+
+  def test_load_from_system_rakefile_on_windows
+    flexmock(Rake::Win32, :windows? => true)
+    flexmock(@app, :standard_system_dir => "XX")
+    flexmock(@app).should_receive(:load).and_return(nil)
+    flexmock(File).should_receive(:directory?).with("D:/AD/Rake").and_return(true)
+    in_environment('RAKE_SYSTEM' => nil, 'HOME' => nil, 'HOMEDRIVE' => 'D:', 'HOMEPATH' => '\\AD') do
+      @app.options.rakelib = []
+      @app.instance_eval do
+        handle_options
+        options.silent = true
+        options.load_system = true
+        options.rakelib = []
+        load_rakefile
+      end
+      assert_equal "D:/AD/Rake", @app.system_dir
+    end
   end
 
   def test_loading_imports
@@ -205,6 +228,19 @@ class TestApplication < Test::Unit::TestCase
     end
   end
 
+  def test_handle_options__should_strip_options_from_ARGV
+    assert !@app.options.trace
+
+    valid_option = '--trace'
+    ARGV.clear
+    ARGV << valid_option
+
+    @app.handle_options
+
+    assert !ARGV.include?(valid_option)
+    assert @app.options.trace
+  end
+
   def test_good_run
     ran = false
     ARGV.clear
@@ -213,7 +249,9 @@ class TestApplication < Test::Unit::TestCase
     @app.instance_eval do
       intern(Rake::Task, "default").enhance { ran = true }
     end
-    @app.run
+    in_environment("PWD" => "test/data/default") do
+      @app.run
+    end
     assert ran
   end
 
@@ -251,7 +289,7 @@ class TestApplication < Test::Unit::TestCase
     @app.intern(Rake::Task, "default").enhance { fail }
     ARGV.clear
     ARGV << '-f' << '-s' <<  '--rakelib=""'
-    assert_raise(SystemExit) {
+    assert_exception(SystemExit) {
       err = capture_stderr { @app.run }
       assert_match(/see full trace/, err)
     }
@@ -263,7 +301,7 @@ class TestApplication < Test::Unit::TestCase
     @app.intern(Rake::Task, "default").enhance { fail }
     ARGV.clear
     ARGV << '-f' << '-s' << '-t'
-    assert_raise(SystemExit) {
+    assert_exception(SystemExit) {
       err = capture_stderr { capture_stdout { @app.run } }
       assert_no_match(/see full trace/, err)
     }
@@ -275,42 +313,19 @@ class TestApplication < Test::Unit::TestCase
     @app.intern(Rake::Task, "default").enhance { fail }
     ARGV.clear
     ARGV << '-f' << '-s' << '--xyzzy'
-    assert_raise(SystemExit) {
+    assert_exception(SystemExit) {
       err = capture_stderr { capture_stdout { @app.run } }
     }
   ensure
     ARGV.clear
   end
-
-  private
-
-  def set_env(settings)
-    result = {}
-    settings.each do |k, v|
-      result[k] = ENV[k]
-      if k == 'PWD'
-        Dir.chdir(v)
-      else
-        ENV[k] = v
-      end
-    end
-    result
-  end
-
-  def in_environment(settings)
-    original_dir = Dir.pwd
-    original_settings = set_env(settings)
-    yield    
-  ensure
-    set_env(original_settings)
-  end
-
 end
 
 
 ######################################################################
 class TestApplicationOptions < Test::Unit::TestCase
   include CaptureStdout
+  include TestMethods
 
   def setup
     clear_argv
@@ -333,46 +348,21 @@ class TestApplicationOptions < Test::Unit::TestCase
 
   def test_default_options
     opts = command_line
-    assert_nil opts.show_task_pattern
-    assert_nil opts.dryrun
-    assert_nil opts.trace
-    assert_nil opts.nosearch
-    assert_nil opts.silent
-    assert_nil opts.show_prereqs
-    assert_nil opts.show_tasks
     assert_nil opts.classic_namespace
+    assert_nil opts.dryrun
+    assert_nil opts.full_description
+    assert_nil opts.ignore_system
+    assert_nil opts.load_system
+    assert_nil opts.nosearch
+    assert_equal ['rakelib'], opts.rakelib
+    assert_nil opts.show_prereqs
+    assert_nil opts.show_task_pattern
+    assert_nil opts.show_tasks
+    assert_nil opts.silent
+    assert_nil opts.trace
     assert_equal ['rakelib'], opts.rakelib
     assert ! RakeFileUtils.verbose_flag
     assert ! RakeFileUtils.nowrite_flag
-  end
-
-  def test_bad_options
-    assert_raise OptionParser::InvalidOption do
-      capture_stderr do
-        flags('--bad', '-t') do |opts|
-        end
-      end
-    end
-  end
-  
-  def test_trace_option
-    flags('--trace', '-t') do |opts|
-      assert opts.trace
-      assert RakeFileUtils.verbose_flag
-      assert ! RakeFileUtils.nowrite_flag
-    end
-  end
-
-  def test_system_option
-    flags('--system', '-G') do |opts|
-      assert opts.load_system
-    end
-  end
-
-  def test_no_system_option
-    flags('--no-system', '-g') do |opts|
-      assert opts.ignore_system
-    end
   end
 
   def test_dry_run
@@ -381,6 +371,50 @@ class TestApplicationOptions < Test::Unit::TestCase
       assert opts.trace
       assert RakeFileUtils.verbose_flag
       assert RakeFileUtils.nowrite_flag
+    end
+  end
+
+  def test_describe
+    flags('--describe') do |opts|
+      assert opts.full_description
+      assert opts.show_tasks
+      assert_equal(//.to_s, opts.show_task_pattern.to_s)
+    end
+  end
+
+  def test_describe_with_pattern
+    flags('--describe=X') do |opts|
+      assert opts.full_description
+      assert opts.show_tasks
+      assert_equal(/X/.to_s, opts.show_task_pattern.to_s)
+    end
+  end
+
+  def test_execute
+    $xyzzy = 0
+    flags('--execute=$xyzzy=1', '-e $xyzzy=1') do |opts|
+      assert_equal 1, $xyzzy
+      assert_equal :exit, @exit
+      $xyzzy = 0
+    end
+  end
+
+  def test_execute_and_continue
+    $xyzzy = 0
+    flags('--execute-continue=$xyzzy=1', '-E $xyzzy=1') do |opts|
+      assert_equal 1, $xyzzy
+      assert_not_equal :exit, @exit
+      $xyzzy = 0
+    end
+  end
+
+  def test_execute_and_print
+    $xyzzy = 0
+    flags('--execute-print=$xyzzy="pugh"', '-p $xyzzy="pugh"') do |opts|
+      assert_equal 'pugh', $xyzzy
+      assert_equal :exit, @exit
+      assert_match(/^pugh$/, @out)
+      $xyzzy = 0
     end
   end
 
@@ -394,46 +428,12 @@ class TestApplicationOptions < Test::Unit::TestCase
     end
   end
 
-  def test_describe
-    flags('--describe') do |opts|
-      assert opts.full_description
-      assert opts.show_tasks
-      assert_equal(//.to_s, opts.show_task_pattern.to_s)
-    end
-  end
-
   def test_libdir
     flags(['--libdir', 'xx'], ['-I', 'xx'], ['-Ixx']) do |opts|
       $:.include?('xx')
     end
   ensure
     $:.delete('xx')
-  end
-
-  def test_nosearch
-    flags('--nosearch', '-N') do |opts|
-      assert opts.nosearch
-    end
-  end
-
-  def test_show_prereqs
-    flags('--prereqs', '-P') do |opts|
-      assert opts.show_prereqs
-    end
-  end
-
-  def test_quiet
-    flags('--quiet', '-q') do |opts|
-      assert ! RakeFileUtils.verbose_flag
-      assert ! opts.silent
-    end
-  end
-
-  def test_silent
-    flags('--silent', '-s') do |opts|
-      assert ! RakeFileUtils.verbose_flag
-      assert opts.silent
-    end
   end
 
   def test_rakefile
@@ -458,12 +458,64 @@ class TestApplicationOptions < Test::Unit::TestCase
   end
 
   def test_missing_require
-    ex = assert_raises(LoadError) do
+    ex = assert_exception(LoadError) do
       flags(['--require', 'test/missing']) do |opts|
       end
     end
     assert_match(/no such file/, ex.message)
     assert_match(/test\/missing/, ex.message)
+  end
+
+  def test_prereqs
+    flags('--prereqs', '-P') do |opts|
+      assert opts.show_prereqs
+    end
+  end
+
+  def test_quiet
+    flags('--quiet', '-q') do |opts|
+      assert ! RakeFileUtils.verbose_flag
+      assert ! opts.silent
+    end
+  end
+
+  def test_no_search
+    flags('--nosearch', '--no-search', '-N') do |opts|
+      assert opts.nosearch
+    end
+  end
+
+  def test_silent
+    flags('--silent', '-s') do |opts|
+      assert ! RakeFileUtils.verbose_flag
+      assert opts.silent
+    end
+  end
+
+  def test_system
+    flags('--system', '-g') do |opts|
+      assert opts.load_system
+    end
+  end
+
+  def test_no_system
+    flags('--no-system', '-G') do |opts|
+      assert opts.ignore_system
+    end
+  end
+
+  def test_trace
+    flags('--trace', '-t') do |opts|
+      assert opts.trace
+      assert RakeFileUtils.verbose_flag
+      assert ! RakeFileUtils.nowrite_flag
+    end
+  end
+
+  def test_trace_rules
+    flags('--rules') do |opts|
+      assert opts.trace_rules
+    end
   end
 
   def test_tasks
@@ -505,7 +557,7 @@ class TestApplicationOptions < Test::Unit::TestCase
 
   def test_bad_option
     capture_stderr do
-      ex = assert_raise(OptionParser::InvalidOption) do
+      ex = assert_exception(OptionParser::InvalidOption) do
         flags('--bad-option') 
       end
       if ex.message =~ /^While/ # Ruby 1.9 error message
@@ -538,6 +590,7 @@ class TestApplicationOptions < Test::Unit::TestCase
 
   def flags(*sets)
     sets.each do |set|
+      ARGV.clear
       @out = capture_stdout { 
         @exit = catch(:system_exit) { opts = command_line(*set) }
       }
@@ -552,7 +605,8 @@ class TestApplicationOptions < Test::Unit::TestCase
       throw :system_exit, :exit
     end
     @app.instance_eval do
-      collect_tasks handle_options
+      handle_options
+      collect_tasks
     end
     @tasks = @app.top_level_tasks
     @app.options
@@ -600,4 +654,53 @@ class TestTaskArgumentParsing < Test::Unit::TestCase
     assert_equal ["a one ana", "two"], args
   end
 
+end
+
+class TestTaskArgumentParsing < Test::Unit::TestCase
+  include InEnvironment
+
+  def test_terminal_width_using_env
+    app = Rake::Application.new
+    in_environment('RAKE_COLUMNS' => '1234') do
+      assert_equal 1234, app.terminal_width
+    end
+  end
+
+  def test_terminal_width_using_stty
+    app = Rake::Application.new
+    flexmock(app,
+      :unix? => true,
+      :dynamic_width_stty => 1235,
+      :dynamic_width_tput => 0)
+    in_environment('RAKE_COLUMNS' => nil) do
+      assert_equal 1235, app.terminal_width
+    end
+  end
+
+  def test_terminal_width_using_tput
+    app = Rake::Application.new
+    flexmock(app,
+      :unix? => true,
+      :dynamic_width_stty => 0,
+      :dynamic_width_tput => 1236)
+    in_environment('RAKE_COLUMNS' => nil) do
+      assert_equal 1236, app.terminal_width
+    end
+  end
+
+  def test_terminal_width_using_hardcoded_80
+    app = Rake::Application.new
+    flexmock(app, :unix? => false)
+    in_environment('RAKE_COLUMNS' => nil) do
+      assert_equal 80, app.terminal_width
+    end
+  end
+
+  def test_terminal_width_with_failure
+    app = Rake::Application.new
+    flexmock(app).should_receive(:unix?).and_throw(RuntimeError)
+    in_environment('RAKE_COLUMNS' => nil) do
+      assert_equal 80, app.terminal_width
+    end
+  end
 end
