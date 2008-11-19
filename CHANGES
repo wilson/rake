@@ -3,6 +3,15 @@
 
 == Version 0.8.4
 
+* Split rake.rb into one file per module/concept for easier distributed
+  development (Wilson Bilkovich)
+
+* Remove legacy toplevel constant warnings and their tests
+  (Wilson Bilkovich)
+
+* Add remove_task and task_map methods to TaskManager to allow for
+  the total replacement of existing tasks (Wilson Bilkovich)
+
 * Preserve case when locating rakefiles (patch from James
   M. Lawrence/quix)
 
