@@ -14,12 +14,12 @@ class TestFileUtils < Test::Unit::TestCase
   def setup
     File.chmod(0750,"test/shellcommand.rb")
   end
-  
+
   def teardown
     FileUtils.rm_rf("testdata")
     FileUtils::LN_SUPPORTED[0] = true
   end
-  
+
   def test_rm_one_file
     create_file("testdata/a")
     FileUtils.rm_rf "testdata/a"
@@ -249,7 +249,7 @@ class TestFileUtils < Test::Unit::TestCase
   end
 
   private
-  
+
   def redirect_stderr
     old_err = $stderr
     $stderr = StringIO.new
